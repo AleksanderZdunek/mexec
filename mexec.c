@@ -53,6 +53,11 @@ char** parse_line(const char* buffer)
     //Count number of tokens to make it easier to tell apriori how much
     //memory we need to allocate for token pointers.
     char* tokbuf = strdup(buffer);
+    if( !tokbuf )
+    {
+        perror("parse_line(): strdup() error");
+        return NULL;
+    }
     int tokcount = 0;
     if( strtok(tokbuf, whitespace) )
     {
