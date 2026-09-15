@@ -173,7 +173,7 @@ void exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
         }
 
         execvp(argv[0], argv);
-        perror("Errror executing command");
+        perror(argv[0]);
         abort();
     }
     else //Parent
