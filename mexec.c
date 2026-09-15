@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     }
     else if( argc > 2 )
     {
-        fprintf(stderr, "Too many arguments\nUsage: mexec <filename>\n");
+        fprintf(stderr, "usage: %s [FILE]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
