@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
         infile = fopen(argv[1], "r");
         if( !infile )
         {
-            perror(NULL);
+            perror(argv[1]);
             exit(EXIT_FAILURE);
         }
     }
