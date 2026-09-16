@@ -12,7 +12,7 @@
 
 char** parse_line(const char* buffer);
 void exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
-void reap_children(void);
+int reap_children(void);
 
 int main(int argc, char* argv[])
 {
@@ -93,9 +93,7 @@ int main(int argc, char* argv[])
     fclose(infile);
     free(command_0);
     close(pipe_fd_in);
-    reap_children();
-
-    return EXIT_SUCCESS;
+    return reap_children();
 }
 
 /*
@@ -184,38 +182,64 @@ void exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
 
 /*
     Wait for child processes
+
+    @return
+        Returns 0 if all children exited with code 0
+        Returns the least significant 8 bits of a child's exit code if a child
+        exited with non-zero exit code.
+        Returns the signal number + 128 if a child was terminated by a signal.
+        If multiple child processes terminated with non-zero exit code or by
+        a signal the return value represents the first process that happend to
+        get reaper. Which process that is is indeterminate.
 */
-void reap_children(void)
+int reap_children(void)
 {
-    int wstatus;
-    while( wait(&wstatus) != -1 );
-    //Expect errno == ECHILD when all child processes have been reaped
-    if( errno != ECHILD )
+    int retval = 0;
+    while(1)
     {
-        perror("Error waiting for child process");
+        int wstatus;
+        pid_t pid = wait(&wstatus);
+        if( -1 == pid )
+        {
+            if( ECHILD == errno ) //No more children
+            {
+                return retval;
+            } else
+            {
+                perror("wait()");
+            }
+        } else
+        {
+            if(WIFEXITED(wstatus)) //Child terminated normally
+            {
+                if(WEXITSTATUS(wstatus) && !retval)
+                {
+                    retval = WEXITSTATUS(wstatus);
+                }
+            }
+            else if(WIFSIGNALED(wstatus)) //Child was terminated by a signal
+            {
+                if(!retval)
+                {
+                    retval = 0x80 | WTERMSIG(wstatus);
+                }
+                if(WCOREDUMP(wstatus))
+                {
+                    fprintf(stderr, "Child pid %d dumped core\n", pid);
+                }
+            }
+            else //I don't expect these to happen. Including for completeness.
+            {
+                if(WIFSTOPPED(wstatus)) //Child was stopped by a signal
+                {
+                    fprintf(stderr, "Child pid %d was stopped by signal %d\n", pid, WSTOPSIG(wstatus));
+                }
+                if(WIFCONTINUED(wstatus))
+                {
+                    fprintf(stderr, "Child pid %d was continued by SIGCONT\n", pid);
 
-        if(WIFEXITED(wstatus)) //Should never be encountered in this code block. Included for completness sake
-        {
-            fprintf(stderr, "Child process exited normally with status code %d\n", WEXITSTATUS(wstatus));
+                }
+            }
         }
-        if(WIFSIGNALED(wstatus))
-        {
-            fprintf(stderr, "Child process was terminated by signal %d\n", WTERMSIG(wstatus));
-            if(WCOREDUMP(wstatus)) fprintf(stderr, "Child process dumped core");
-        }
-        if(WIFSTOPPED(wstatus))
-        {
-            fprintf(stderr, "Child process was stopped by signal %d\n", WSTOPSIG(wstatus));
-        }
-        if(WIFCONTINUED(wstatus))
-        {
-            fprintf(stderr, "Child process was continued by SIGCONT\n");
-        }
-
-        if( kill(0, SIGABRT) == -1 )
-        {
-            perror("Kill process group error");
-        }
-        abort();
     }
 }
