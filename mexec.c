@@ -12,14 +12,7 @@
 #define PIPE_FD_IDX_WRITE 1
 
 char** parse_line(const char* buffer);
-enum exec_command_return_codes
-{
-    FORK_OK,
-    FORK_ERROR,
-    FD_DUP_ERROR,
-    EXEC_ERROR,
-};
-int exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
+bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
 
 bool g_main_process = true;
@@ -57,13 +50,13 @@ int main(int argc, char* argv[])
         fclose(infile);
         exit(EXIT_FAILURE);
     }
-    char** command_0 = parse_line(linebuf);
+    char** command_0 = parse_line(linebuf); //command_0 gets executed afte the next command has been read and a pipe between them created
     if( !command_0 )
     {
         fclose(infile);
         exit(EXIT_FAILURE);
     }
-    int pipe_fd_in = STDIN_FILENO; //First command reads from stdin instead of a pipe.
+    int pipe_fd_in = STDIN_FILENO; //First command gets stdin instead of the read end of a pipe.
 
     int exit_status = EXIT_SUCCESS;
 
@@ -87,18 +80,13 @@ int main(int argc, char* argv[])
         }
 
         //Exec previous command
-        switch( exec_command(command_0, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]) )
+        if( !exec_command(command_0, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]) )
         {
-            case FORK_ERROR: //fallthrough
-            case FD_DUP_ERROR:
-            case EXEC_ERROR:
-                free(command_next);
-                close(pipefd[0]);
-                close(pipefd[1]);
-                exit_status = EXIT_FAILURE;
-                goto cleanup;
-            default:
-                break;
+            free(command_next);
+            close(pipefd[0]);
+            close(pipefd[1]);
+            exit_status = EXIT_FAILURE;
+            goto cleanup;
         }
 
         //Shuffle up
@@ -111,16 +99,10 @@ int main(int argc, char* argv[])
     //TODO: error checking of fgets()
 
     //exec last command
-    switch( exec_command(command_0, pipe_fd_in, STDOUT_FILENO) )
+    if( !exec_command(command_0, pipe_fd_in, STDOUT_FILENO) )
     {
-        case FD_DUP_ERROR: //fallthrough
-        case EXEC_ERROR:
-        case FORK_ERROR:
-            exit_status = EXIT_FAILURE;
-            goto cleanup;
-            break;
-        default:
-            break;
+        exit_status = EXIT_FAILURE;
+        goto cleanup;
     }
 
     //clean up
@@ -196,9 +178,6 @@ char** parse_line(const char* buffer)
 /*
     Fork and exec pipeline command.
 
-    Sets the global g_main_process flag to false in child process after
-    successful fork.
-
     @param argv Pointer to array of string pointers. The first string pointer
         argv[0] is the command to execute. The rest are arguments to the
         command. The last string pointer shall be NULL.
@@ -209,49 +188,47 @@ char** parse_line(const char* buffer)
         command. May be STDOUT_FILENO if command is the first command in
         the pipeline.
 
-    @return One of enum exec_command_return_codes
-        FORK_OK if fork was successful. Parent process receives this code.
-        FORK_ERROR if fork failed. Parent process receives this code.
-        FD_DUP_ERROR if duplicating pipe in/out file descriptor failed.
-            Child process receives this error.
-        EXEC_ERROR if executing the command failed. Child process receives this
-            error.
-        Does not return in child process if command executed successfully.
-
+    @return
+        true in parent process on successful fork
+        false on error
+        Does not return in child process on succesfull exec
+        Also sets the global g_main_process flag to false in child process after
+        successful fork.
 */
-int exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
+bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
 {
     const pid_t pid = fork();
     if( pid == -1 ) //Error
     {
         perror("fork()");
-        return FORK_ERROR;
+        return false;
     }
     else if( pid == 0 ) //Child
     {
         g_main_process = false;
+
         if( dup2(pipe_fd_in, STDIN_FILENO) == -1 )
         {
             perror("Error duplicating pipe input file descriptor");
-            return FD_DUP_ERROR;
+            return false;
         }
 
         if( dup2(pipe_fd_out, STDOUT_FILENO) == -1 )
         {
             perror("Error duplicating pipe output file descriptor");
             close(STDIN_FILENO);
-            return FD_DUP_ERROR;
+            return false;
         }
 
         execvp(argv[0], argv);
         perror(argv[0]);
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
-        return EXEC_ERROR;
+        return false;
     }
     else //Parent
     {
-        return FORK_OK;
+        return true;
     }
 }
 
