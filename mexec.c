@@ -1,3 +1,6 @@
+/*
+    (C) Aleksander Zdunek <redacted>@cs.umu.se
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
