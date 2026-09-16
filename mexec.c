@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 #define DEBUG_EXPR(expr) fprintf(stderr, "%s:%d:%s(): %s: 0x%llX\n", __FILE__, __LINE__, __func__, #expr, (unsigned long long)(expr))
 
@@ -11,8 +12,17 @@
 #define PIPE_FD_IDX_WRITE 1
 
 char** parse_line(const char* buffer);
-void exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
+enum exec_command_return_codes
+{
+    FORK_OK,
+    FORK_ERROR,
+    FD_DUP_ERROR,
+    EXEC_ERROR,
+};
+int exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
+
+bool g_main_process = true;
 
 int main(int argc, char* argv[])
 {
@@ -53,7 +63,9 @@ int main(int argc, char* argv[])
         fclose(infile);
         exit(EXIT_FAILURE);
     }
-    int pipe_fd_in = STDIN_FILENO;
+    int pipe_fd_in = STDIN_FILENO; //First command reads from stdin instead of a pipe.
+
+    int exit_status = EXIT_SUCCESS;
 
     //Read next command line, create pipe, exec previous command
     while( fgets(linebuf, sizeof(linebuf), infile) )
@@ -75,7 +87,19 @@ int main(int argc, char* argv[])
         }
 
         //Exec previous command
-        exec_command(command_0, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]);
+        switch( exec_command(command_0, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]) )
+        {
+            case FORK_ERROR: //fallthrough
+            case FD_DUP_ERROR:
+            case EXEC_ERROR:
+                free(command_next);
+                close(pipefd[0]);
+                close(pipefd[1]);
+                exit_status = EXIT_FAILURE;
+                goto cleanup;
+            default:
+                break;
+        }
 
         //Shuffle up
         free(command_0);
@@ -87,13 +111,33 @@ int main(int argc, char* argv[])
     //TODO: error checking of fgets()
 
     //exec last command
-    exec_command(command_0, pipe_fd_in, STDOUT_FILENO);
+    switch( exec_command(command_0, pipe_fd_in, STDOUT_FILENO) )
+    {
+        case FD_DUP_ERROR: //fallthrough
+        case EXEC_ERROR:
+        case FORK_ERROR:
+            exit_status = EXIT_FAILURE;
+            goto cleanup;
+            break;
+        default:
+            break;
+    }
 
     //clean up
+cleanup:
     fclose(infile);
     free(command_0);
     close(pipe_fd_in);
-    return reap_children();
+    if(g_main_process) //Only parent process waits for children.
+    {
+        int child_exit_status = reap_children();
+        //Don't overwrite exit status if it's already been set to EXIT_FAILURE elsewhere
+        if( EXIT_SUCCESS == exit_status )
+        {
+            exit_status = child_exit_status;
+        }
+    }
+    return exit_status;
 }
 
 /*
@@ -150,33 +194,64 @@ char** parse_line(const char* buffer)
 }
 
 /*
-    TODO: documentation
+    Fork and exec pipeline command.
+
+    Sets the global g_main_process flag to false in child process after
+    successful fork.
+
+    @param argv Pointer to array of string pointers. The first string pointer
+        argv[0] is the command to execute. The rest are arguments to the
+        command. The last string pointer shall be NULL.
+    @param pipe_fd_in File descriptor for read end of the input pipe to the
+        command. May be STDIN_FILENO if command is the first command in the
+        pipeline.
+    @param pipe_fd_out File descriptor for write end of output pipe for the
+        command. May be STDOUT_FILENO if command is the first command in
+        the pipeline.
+
+    @return One of enum exec_command_return_codes
+        FORK_OK if fork was successful. Parent process receives this code.
+        FORK_ERROR if fork failed. Parent process receives this code.
+        FD_DUP_ERROR if duplicating pipe in/out file descriptor failed.
+            Child process receives this error.
+        EXEC_ERROR if executing the command failed. Child process receives this
+            error.
+        Does not return in child process if command executed successfully.
+
 */
-void exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
+int exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
 {
     const pid_t pid = fork();
     if( pid == -1 ) //Error
     {
         perror("fork()");
-        //TODO: better error handling
-        exit(EXIT_FAILURE);
+        return FORK_ERROR;
     }
     else if( pid == 0 ) //Child
     {
-        if( dup2(pipe_fd_in, STDIN_FILENO) == -1 ||
-            dup2(pipe_fd_out, STDOUT_FILENO) == -1 )
+        g_main_process = false;
+        if( dup2(pipe_fd_in, STDIN_FILENO) == -1 )
         {
-            perror("Error duplicating file descriptor");
-            abort();
+            perror("Error duplicating pipe input file descriptor");
+            return FD_DUP_ERROR;
+        }
+
+        if( dup2(pipe_fd_out, STDOUT_FILENO) == -1 )
+        {
+            perror("Error duplicating pipe output file descriptor");
+            close(STDIN_FILENO);
+            return FD_DUP_ERROR;
         }
 
         execvp(argv[0], argv);
         perror(argv[0]);
-        abort();
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        return EXEC_ERROR;
     }
     else //Parent
     {
-        return;
+        return FORK_OK;
     }
 }
 
