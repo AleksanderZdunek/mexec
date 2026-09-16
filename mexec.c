@@ -221,7 +221,7 @@ int reap_children(void)
             {
                 if(!retval)
                 {
-                    retval = 0x80 | WTERMSIG(wstatus);
+                    retval = 128 + WTERMSIG(wstatus);
                 }
                 if(WCOREDUMP(wstatus))
                 {
