@@ -66,8 +66,8 @@ int main(int argc, char* argv[])
         char** command_next = parse_line(linebuf);
         if( !command_next )
         {
-            //TODO: cleanup
-            exit(EXIT_FAILURE);
+            exit_status = EXIT_FAILURE;
+            goto cleanup;
         }
 
         //Create pipe
@@ -75,8 +75,9 @@ int main(int argc, char* argv[])
         if( pipe(pipefd) )
         {
             perror("Error creating pipe");
-            //TODO: cleanup
-            exit(EXIT_FAILURE);
+            free(command_next);
+            exit_status = EXIT_FAILURE;
+            goto cleanup;
         }
 
         //Exec previous command
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
         pipe_fd_in = pipefd[PIPE_FD_IDX_READ];
         close(pipefd[PIPE_FD_IDX_WRITE]);
     }
-    //TODO: error checking of fgets()
+    if(ferror(infile)) perror("Error reading first line");
 
     //exec last command
     if( !exec_command(command_0, pipe_fd_in, STDOUT_FILENO) )
