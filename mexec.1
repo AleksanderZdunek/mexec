@@ -1,4 +1,4 @@
-.TH mexec 1 "TODO: update date 15 August 2026" "Version 0.x"
+.TH mexec 1 "TODO: update date 17 September 2026" "Version 0.x"
 
 .SH NAME
 mexec - my exec, creates a pipeline of commands
@@ -7,7 +7,16 @@ mexec - my exec, creates a pipeline of commands
 mexec [FILE]
 
 .SH DESCRIPTION
-TODO
+Executes a list of commands where standard output (stdout) from the previous
+command is piped to standard input (stdin) of the next command.
+Commands are read from stdin by default, or optionally from a
+.I FILE
+passed as an argument to
+.BR mexec .
+.PP
+Each input line is considered a command line with space-separated arguments.
+Command lines shall not be longer than 1024 bytes each.
+Empty lines and quotation marks are not supported.
 
 .SH SOLUTION
 TODO
@@ -17,12 +26,26 @@ sit amet consectitur
 
 .SH EXIT STATUS
 .IP 0
-    Successful pipeline execution
+    Successful pipeline execution and all commands terminated with code 0
 .IP 1
-    Something went wrong
-TODO: other exit codes?
+    An error occured
+.IP "<child exit code>"
+    The return code from a command, if pipeline executed successfully but at least
+    one command exited with non-zero return code.
+.IP "128 + <signal number>"
+    If pipeline executed successfully but a command was terminated by a signal.
+    Exit status is the signal number added to the constant 128.
+    Could also mean that
+.BR mexec " itself was terminated by a signal."
+.PP
+In case multiple commands returned non-zero exit code or were terminated by a signal
+it is indeterminate which code was propagated as the exit status.
+.PP
+Note that it may not be possible to distinguish between a child exit code 1 or
+an error setting up the pipeline. Likewise it may also not be possible to
+distinguish between a child exit code larger than 128 and a signal termination code.
 
 .SH AUTHORS
-Aleksander Zdunek TODO: add username
-.br
+Aleksander Zdunek <redacted>@cs.umu.se
+
 This program was an assignment for the course Systemnära Programmering 5DV254 at UMU.
