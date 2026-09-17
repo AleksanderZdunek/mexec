@@ -19,6 +19,24 @@ Command lines shall not be longer than 1024 bytes each.
 Empty lines and quotation marks are not supported.
 
 .SH SOLUTION
+Command lines are read from an input stream, either from stdin or from an open
+file. Each command line is parsed into an array of arguments, where the first
+element is the command itself and the rest of the elements are arguments for the
+command. The first parsed command line is stored, then next command
+line is parsed and a pipe is created with the pipe() system call. This pipe is
+the output pipe for the previous command and the input pipe for the next command.
+When the output pipe has been created the previous command is executed with the
+read end of the input pipe attached to stdin for the command process, using the
+dup2() system call, and the write end of the output pipe is attached to stdout
+for the command process. For the very first command in the pipeline there is
+no input pipe and stdin remains unaltered instead. The next command is read and
+a pipe between previous and next command is created while there are commands to
+read. The final command is executed with the read end of its input pipe attach
+to stdin of the command process and stdout of the command process remaining
+unaltered.
+Once the whole pipeline has been set up, the main process waits for all child
+command processes to terminate before exiting.
+.PP
 TODO
 lorem ipsum dolor
 .br
