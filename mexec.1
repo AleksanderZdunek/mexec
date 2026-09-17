@@ -1,4 +1,4 @@
-.TH mexec 1 "TODO: update date 17 September 2026" "Version 0.x"
+.TH mexec 1 "17 September 2026" "Version 1.0"
 
 .SH NAME
 mexec - my exec, creates a pipeline of commands
@@ -37,10 +37,47 @@ unaltered.
 Once the whole pipeline has been set up, the main process waits for all child
 command processes to terminate before exiting.
 .PP
-TODO
-lorem ipsum dolor
-.br
-sit amet consectitur
+Executing a command is done by forkinging the process with the fork() system
+call. In the child process the read end of the input pipe is attached to the
+file descriptor for stdin, with the dup2() system call, and the write end of
+the output pipe is attached to the file descriptor for stdout. Then the command
+is executed with execvp() by passing the command argument array point.
+.PP
+Error handling of any failed library or system call is done by manually freeing
+any allocated resources (memory pointers or file descriptors) and exiting directly
+with appropriat exit status code or jumping to waiting for child processes if
+there is a possibility that any child process may have been spawned at that point
+in the code.
+
+.SS Main algorithm
+.IP "1. Let stdin file descriptor represent read end of input pipe"
+.IP "2. Read and parse first command"
+.IP "3. While there are commands left to read:"
+.RS
+.IP "3.1 Read and parse next command"
+.IP "3.2 Create output pipe"
+.IP "3.3 Execute previous command"
+.RS
+.IP "3.3.1 Fork process"
+In child process:
+.RS
+.IP "3.3.1.1 Duplicate read end of input pipe on to stdin file descriptor (dup2())"
+.IP "3.3.1.2 Duplicate write end of output pipe on to stdout file descriptor (dup2())"
+.IP "3.3.1.2 exec() parsed argument list for previous command (execvp())"
+.RE
+.RE
+.IP "3.4 Close read end of input pipe"
+.IP "3.5 Close write end of output pipe"
+.IP "3.6 Designate the output pipe as the new input pipe"
+Store file descriptor for read end of output pipe as read end of new input pipe.
+Overwriting the file descriptor for the read end of the previous input pipe (which was closed in 3.4).
+.RE
+.IP "4. Execute the last parsed command."
+    (See 3.3)
+    With file descriptor for stdout instead of write end of output pipe.
+.IP "5. Wait for all child processes to terminate (wait())"
+.IP "6. Exit with appropriate exit code"
+.PP
 
 .SH EXIT STATUS
 .IP 0
