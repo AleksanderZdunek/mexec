@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "input.h"
 
 #define PIPE_FD_IDX_READ 0
@@ -15,6 +16,8 @@
 
 bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
+bool create_pipes(int* fd, size_t count);
+void close_fds(int* fd, size_t count);
 
 bool g_main_process = true;
 
@@ -38,9 +41,8 @@ int main(int argc, char* argv[])
     }
 
     size_t nrof_commands = 0;
-    //I'm a three star programmer now!
-    char*** commands = get_command_lines(infile, &nrof_commands);
-    fclose(infile);
+    char*** commands = get_command_lines(infile, &nrof_commands); //I'm a three star programmer now!
+    if(infile != stdin) fclose(infile);
     if(!commands)
     {
         fprintf(stderr, "Error parsing command lines\n");
@@ -52,42 +54,28 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    int exit_status = EXIT_SUCCESS;
-    int pipe_fd_in = STDIN_FILENO; //First command gets stdin instead of the read end of a pipe.
-    for(char*** cmd_p = commands; *cmd_p; ++cmd_p)
+    int pipe_fds[2 * nrof_commands];
+    if(!create_pipes(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0])))
     {
-        int pipefd[2];
-        pipefd[PIPE_FD_IDX_WRITE] = STDOUT_FILENO;
-        if(*(cmd_p + 1))
-        {
-            //Create pipe
-            if(pipe(pipefd))
-            {
-                perror("Error creating pipe");
-                exit_status = EXIT_FAILURE;
-                goto cleanup;
-            }
-        }
-
-        //Exec command
-        if(!exec_command(*cmd_p, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]))
-        {
-            close(pipefd[0]);
-            close(pipefd[1]);
-            exit_status = EXIT_FAILURE;
-            goto cleanup;
-        }
-
-        //Shuffle up file descriptors
-        if(STDIN_FILENO != pipe_fd_in) close(pipe_fd_in);
-        pipe_fd_in = pipefd[PIPE_FD_IDX_READ];
-        close(pipefd[PIPE_FD_IDX_WRITE]);
+        free_command_lines(commands);
+        exit(EXIT_FAILURE);
     }
 
-    //clean up
-cleanup:
-    close(pipe_fd_in);
+    int exit_status = EXIT_SUCCESS;
+    int* pipefd = pipe_fds;
+    for(char*** cmd_p = commands; *cmd_p; ++cmd_p, pipefd += 2)
+    {
+        if(!exec_command(*cmd_p, pipefd[PIPE_FD_IDX_READ], pipefd[PIPE_FD_IDX_WRITE]))
+        {
+            exit_status = EXIT_FAILURE;
+            break;
+        }
+        if(pipefd[0] > STDERR_FILENO) close(pipefd[0]);
+        if(pipefd[1] > STDERR_FILENO) close(pipefd[1]);
+    }
+
     free_command_lines(commands);
+    close_fds(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0]));
     if(g_main_process) //Only parent process waits for children.
     {
         int child_exit_status = reap_children();
@@ -217,6 +205,45 @@ int reap_children(void)
 
                 }
             }
+        }
+    }
+}
+
+/*
+    TODO: Document
+*/
+bool create_pipes(int* fd, size_t count)
+{
+    assert(count % 2 == 0); //Should be an even number
+    memset(fd, 0, count * sizeof(fd[0]));
+    fd[0] = STDIN_FILENO;
+    fd[count - 1] = STDOUT_FILENO;
+    for(size_t i = 1; i < count - 1; i += 2)
+    {
+        int pipefd[2];
+        if(pipe(pipefd))
+        {
+            perror("Error creating pipe");
+            close_fds(fd, count);
+            return false;
+        }
+        fd[i] = pipefd[PIPE_FD_IDX_WRITE];
+        fd[i+1] = pipefd[PIPE_FD_IDX_READ];
+    }
+    return true;
+}
+
+/*
+    TODO: Document
+*/
+void close_fds(int* fd, size_t count)
+{
+    for(size_t i = 0; i < count; ++i)
+    {
+        if(fd[i] > STDERR_FILENO)
+        {
+            close(fd[i]);
+            fd[i] = STDIN_FILENO;
         }
     }
 }
