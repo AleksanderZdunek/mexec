@@ -37,8 +37,9 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
+    size_t nrof_commands = 0;
     //I'm a three star programmer now!
-    char*** commands = get_command_lines(infile);
+    char*** commands = get_command_lines(infile, &nrof_commands);
     fclose(infile);
     if(!commands)
     {

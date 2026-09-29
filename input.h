@@ -10,7 +10,7 @@
 /*
     TODO: documentation
 */
-char*** get_command_lines(FILE* infile);
+char*** get_command_lines(FILE* infile, size_t* out_nrof_lines);
 
 /*
     TODO: documentation

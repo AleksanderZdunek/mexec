@@ -55,7 +55,7 @@ static char** parse_line(const char* buffer)
     return tokp_buf;
 }
 
-char*** get_command_lines(FILE* infile)
+char*** get_command_lines(FILE* infile, size_t* out_nrof_lines)
 {
     size_t arr_len = 1;
     char*** arr = malloc(arr_len * sizeof(char***));
@@ -92,6 +92,7 @@ char*** get_command_lines(FILE* infile)
         return NULL;
     }
 
+    if(out_nrof_lines) *out_nrof_lines = arr_len - 1;
     return arr;
 }
 
