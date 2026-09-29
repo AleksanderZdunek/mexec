@@ -57,6 +57,8 @@ static char** parse_line(const char* buffer)
 
 char*** get_command_lines(FILE* infile, size_t* out_nrof_lines)
 {
+    //TODO: remove null termination
+    //TODO: assert out_nrof_lines not null
     size_t arr_len = 1;
     char*** arr = malloc(arr_len * sizeof(char***));
     if(!arr)

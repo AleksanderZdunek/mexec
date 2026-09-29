@@ -10,6 +10,7 @@
 /*
     TODO: documentation
 */
+//TODO: rename -> parse_input()?
 char*** get_command_lines(FILE* infile, size_t* out_nrof_lines);
 
 /*
