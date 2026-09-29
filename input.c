@@ -15,8 +15,7 @@ static char** parse_line(const char* buffer)
     const char* const whitespace = " \f\n\r\t\v";
     buffer += strspn(buffer, whitespace); //Ignore leading whitespace
 
-    //Count number of tokens to make it easier to tell apriori how much
-    //memory we need to allocate for token pointers.
+    //Count number of tokens to make it easier to allocate memory for token pointers
     char* tokbuf = strdup(buffer);
     if( !tokbuf )
     {
