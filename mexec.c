@@ -22,20 +22,15 @@ bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds);
 
 int main(int argc, char* argv[])
 {
-    //TODO: break out argument handling?
-    FILE* infile = stdin;
-    if( 2 == argc )
-    {
-        infile = fopen(argv[1], "r");
-        if( !infile )
-        {
-            perror(argv[1]);
-            exit(EXIT_FAILURE);
-        }
-    }
-    else if( argc > 2 )
+    if(argc > 2)
     {
         fprintf(stderr, "usage: %s [FILE]\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    FILE* infile = stdin;
+    if(argc == 2 && !(infile = fopen(argv[1], "r")))
+    {
+        perror(argv[1]);
         exit(EXIT_FAILURE);
     }
 
