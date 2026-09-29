@@ -20,8 +20,6 @@ bool create_pipes(int* fd, size_t count);
 void close_fds(int* fd, size_t count);
 bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds);
 
-bool g_main_process = true;
-
 int main(int argc, char* argv[])
 {
     //TODO: break out argument handling?
@@ -42,7 +40,8 @@ int main(int argc, char* argv[])
     }
 
     size_t nrof_commands = 0;
-    char*** commands = get_command_lines(infile, &nrof_commands); //I'm a three star programmer now!
+    //I'm a three star programmer now!
+    char*** commands = get_command_lines(infile, &nrof_commands);
     if(infile != stdin) fclose(infile);
     if(!commands)
     {
@@ -70,14 +69,11 @@ int main(int argc, char* argv[])
 
     free_command_lines(commands);
     close_fds(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0]));
-    if(g_main_process) //Only parent process waits for children.
+    int child_exit_status = reap_children();
+    //Don't overwrite exit status if it's already been set to EXIT_FAILURE elsewhere
+    if( EXIT_SUCCESS == exit_status )
     {
-        int child_exit_status = reap_children();
-        //Don't overwrite exit status if it's already been set to EXIT_FAILURE elsewhere
-        if( EXIT_SUCCESS == exit_status )
-        {
-            exit_status = child_exit_status;
-        }
+        exit_status = child_exit_status;
     }
     return exit_status;
 }
@@ -112,8 +108,6 @@ bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out)
     }
     else if( pid == 0 ) //Child
     {
-        g_main_process = false;
-
         if( dup2(pipe_fd_in, STDIN_FILENO) == -1 )
         {
             perror("Error duplicating pipe input file descriptor");
