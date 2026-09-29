@@ -1,5 +1,6 @@
 /*
     (C) Aleksander Zdunek <redacted>@cs.umu.se
+    //TODO: fix header
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #define PIPE_FD_IDX_READ 0
 #define PIPE_FD_IDX_WRITE 1
 
+//TODO: reorder
 bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
 bool create_pipes(int* fd, size_t count);
@@ -56,21 +58,14 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    int exit_status = EXIT_SUCCESS;
-    if(!run_pipeline(commands, nrof_commands, pipe_fds))
-    {
-        exit_status = EXIT_FAILURE;
-    }
+    bool pipeline_ok = run_pipeline(commands, nrof_commands, pipe_fds);
 
     free_command_lines(commands);
     close_fds(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0]));
     int child_exit_status = reap_children();
-    //Don't overwrite exit status if it's already been set to EXIT_FAILURE elsewhere
-    if( EXIT_SUCCESS == exit_status )
-    {
-        exit_status = child_exit_status;
-    }
-    return exit_status;
+
+    if(pipeline_ok) return child_exit_status;
+    return EXIT_FAILURE;
 }
 
 /*
