@@ -18,6 +18,7 @@ bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
 bool create_pipes(int* fd, size_t count);
 void close_fds(int* fd, size_t count);
+bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds);
 
 bool g_main_process = true;
 
@@ -62,16 +63,9 @@ int main(int argc, char* argv[])
     }
 
     int exit_status = EXIT_SUCCESS;
-    int* pipefd = pipe_fds;
-    for(char*** cmd_p = commands; *cmd_p; ++cmd_p, pipefd += 2)
+    if(!run_pipeline(commands, nrof_commands, pipe_fds))
     {
-        if(!exec_command(*cmd_p, pipefd[PIPE_FD_IDX_READ], pipefd[PIPE_FD_IDX_WRITE]))
-        {
-            exit_status = EXIT_FAILURE;
-            break;
-        }
-        if(pipefd[0] > STDERR_FILENO) close(pipefd[0]);
-        if(pipefd[1] > STDERR_FILENO) close(pipefd[1]);
+        exit_status = EXIT_FAILURE;
     }
 
     free_command_lines(commands);
@@ -246,4 +240,19 @@ void close_fds(int* fd, size_t count)
             fd[i] = STDIN_FILENO;
         }
     }
+}
+
+/*
+    TODO: Document
+*/
+bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds)
+{
+    for(size_t i = 0; i < nrof_commands; ++i)
+    {
+        int* fds = &pipe_fds[2*i];
+        bool ok = exec_command(commands[i], fds[PIPE_FD_IDX_READ], fds[PIPE_FD_IDX_WRITE]);
+        close_fds(fds, 2);
+        if(!ok) return false;
+    }
+    return true;
 }
