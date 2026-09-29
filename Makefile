@@ -1,6 +1,6 @@
 #(C) Aleksander Zdunek <redacted>@cs.umu.se
 TARGET = mexec
-OBJ = 	mexec.o
+OBJ = 	mexec.o input.o
 
 CC = gcc
 CFLAGS = -g -std=gnu11 -Werror -Wall -Wextra -Wpedantic -Wmissing-declarations \
@@ -8,8 +8,9 @@ CFLAGS = -g -std=gnu11 -Werror -Wall -Wextra -Wpedantic -Wmissing-declarations \
 
 all: $(TARGET)
 
+$(OBJ): input.h debug.h
 %.o: %.c Makefile
-	$(CC) $(CFLAGS)   -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^

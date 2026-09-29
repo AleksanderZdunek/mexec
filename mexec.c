@@ -8,11 +8,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include "input.h"
 
 #define PIPE_FD_IDX_READ 0
 #define PIPE_FD_IDX_WRITE 1
 
-char** parse_line(const char* buffer);
 bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
 int reap_children(void);
 
@@ -20,6 +20,7 @@ bool g_main_process = true;
 
 int main(int argc, char* argv[])
 {
+    //TODO: break out argument handling?
     FILE* infile = stdin;
     if( 2 == argc )
     {
@@ -36,82 +37,56 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    //Read first command line
-    char linebuf[1025];
-    if( !fgets(linebuf, sizeof(linebuf), infile) )
+    //I'm a three star programmer now!
+    char*** commands = get_command_lines(infile);
+    fclose(infile);
+    if(!commands)
     {
-        if( feof(infile) )
-        {
-            fprintf(stderr, "Nothing to pipe\n");
-        }
-        if( ferror(infile) )
-        {
-            perror("Error reading first command line");
-        }
-        fclose(infile);
+        fprintf(stderr, "Error parsing command lines\n");
+        exit(EXIT_FAILURE);
+    } else if(!*commands)
+    {
+        fprintf(stderr, "Nothing to pipe\n");
+        free_command_lines(commands);
         exit(EXIT_FAILURE);
     }
-    char** command_0 = parse_line(linebuf); //command_0 gets executed afte the next command has been read and a pipe between them created
-    if( !command_0 )
-    {
-        fclose(infile);
-        exit(EXIT_FAILURE);
-    }
-    int pipe_fd_in = STDIN_FILENO; //First command gets stdin instead of the read end of a pipe.
 
     int exit_status = EXIT_SUCCESS;
-
-    //Read next command line, create pipe, exec previous command
-    while( fgets(linebuf, sizeof(linebuf), infile) )
+    int pipe_fd_in = STDIN_FILENO; //First command gets stdin instead of the read end of a pipe.
+    for(char*** cmd_p = commands; *cmd_p; ++cmd_p)
     {
-        char** command_next = parse_line(linebuf);
-        if( !command_next )
-        {
-            exit_status = EXIT_FAILURE;
-            goto cleanup;
-        }
-
-        //Create pipe
         int pipefd[2];
-        if( pipe(pipefd) )
+        pipefd[PIPE_FD_IDX_WRITE] = STDOUT_FILENO;
+        if(*(cmd_p + 1))
         {
-            perror("Error creating pipe");
-            free(command_next);
-            exit_status = EXIT_FAILURE;
-            goto cleanup;
+            //Create pipe
+            if(pipe(pipefd))
+            {
+                perror("Error creating pipe");
+                exit_status = EXIT_FAILURE;
+                goto cleanup;
+            }
         }
 
-        //Exec previous command
-        if( !exec_command(command_0, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]) )
+        //Exec command
+        if(!exec_command(*cmd_p, pipe_fd_in, pipefd[PIPE_FD_IDX_WRITE]))
         {
-            free(command_next);
             close(pipefd[0]);
             close(pipefd[1]);
             exit_status = EXIT_FAILURE;
             goto cleanup;
         }
 
-        //Shuffle up
-        free(command_0);
-        command_0 = command_next;
+        //Shuffle up file descriptors
         if(STDIN_FILENO != pipe_fd_in) close(pipe_fd_in);
         pipe_fd_in = pipefd[PIPE_FD_IDX_READ];
         close(pipefd[PIPE_FD_IDX_WRITE]);
     }
-    if(ferror(infile)) perror("Error reading first line");
-
-    //exec last command
-    if( !exec_command(command_0, pipe_fd_in, STDOUT_FILENO) )
-    {
-        exit_status = EXIT_FAILURE;
-        goto cleanup;
-    }
 
     //clean up
 cleanup:
-    fclose(infile);
-    free(command_0);
     close(pipe_fd_in);
+    free_command_lines(commands);
     if(g_main_process) //Only parent process waits for children.
     {
         int child_exit_status = reap_children();
@@ -122,59 +97,6 @@ cleanup:
         }
     }
     return exit_status;
-}
-
-/*
-    Parse a string into whitespace-separated tokens.
-
-    @param buffer Pointer to null-terminated string to parse.
-
-    @return Pointer to array of token pointers. This pointer should be freed.
-        Last pointer in array is NULL.
-*/
-char** parse_line(const char* buffer)
-{
-    const char* const whitespace = " \f\n\r\t\v";
-    buffer += strspn(buffer, whitespace); //Ignore leading whitespace
-
-    //Count number of tokens to make it easier to tell apriori how much
-    //memory we need to allocate for token pointers.
-    char* tokbuf = strdup(buffer);
-    if( !tokbuf )
-    {
-        perror("parse_line(): strdup() error");
-        return NULL;
-    }
-    int tokcount = 0;
-    if( strtok(tokbuf, whitespace) )
-    {
-        ++tokcount;
-        while( strtok(NULL, whitespace) ) ++tokcount;
-    }
-    free(tokbuf);
-
-    //Allocate contiguous memory for token pointers and token buffer.
-    //That way only one pointer needs to be freed later.
-    char** tokp_buf = malloc( sizeof(char**)*(tokcount + 1) + strlen(buffer) + 1);
-    if( !tokp_buf )
-    {
-        perror("parse_line(): error allocating memory for token buffer");
-        return NULL;
-    }
-    tokbuf = (char*)(tokp_buf + tokcount + 1); //Token buffer follows pointer buffer
-    strcpy(tokbuf, buffer);
-
-    //Find tokens again, this time filling pointer array.
-    size_t i = 0;
-    char* tok = strtok(tokbuf, whitespace);
-    while(tok)
-    {
-        tokp_buf[i++] = tok;
-        tok = strtok(NULL, whitespace);
-    }
-    tokp_buf[i] = NULL;
-
-    return tokp_buf;
 }
 
 /*
