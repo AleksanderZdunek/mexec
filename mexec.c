@@ -2,6 +2,7 @@
     (C) Aleksander Zdunek <redacted>@cs.umu.se
     //TODO: fix header
 */
+#define _GNU_SOURCE //pipe2()
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -10,6 +11,7 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <fcntl.h>
 #include "input.h"
 
 #define PIPE_FD_IDX_READ 0
@@ -75,7 +77,7 @@ bool create_pipes(int* fd, size_t count)
     for(size_t i = 1; i < count - 1; i += 2)
     {
         int pipefd[2];
-        if(pipe(pipefd))
+        if(pipe2(pipefd, O_CLOEXEC))
         {
             perror("Error creating pipe");
             close_fds(fd, count);
