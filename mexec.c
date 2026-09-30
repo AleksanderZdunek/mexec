@@ -47,7 +47,8 @@ int main(int argc, char* argv[])
     }
 
     int pipe_fds[2 * nrof_commands];
-    if(!create_pipes(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0])))
+    size_t pipe_fds_len = sizeof(pipe_fds)/sizeof(pipe_fds[0]);
+    if(!create_pipes(pipe_fds, pipe_fds_len))
     {
         free_command_lines(commands, nrof_commands);
         exit(EXIT_FAILURE);
@@ -56,7 +57,7 @@ int main(int argc, char* argv[])
     bool pipeline_ok = run_pipeline(commands, nrof_commands, pipe_fds);
 
     free_command_lines(commands, nrof_commands);
-    close_fds(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0]));
+    close_fds(pipe_fds, pipe_fds_len);
     int child_exit_status = reap_children();
 
     if(pipeline_ok) return child_exit_status;
