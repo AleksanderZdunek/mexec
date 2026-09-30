@@ -2,6 +2,7 @@
     (C) Aleksander Zdunek <redacted>@cs.umu.se
     //TODO: fix header
 */
+//TODO: clean up includes?
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -42,25 +43,20 @@ int main(int argc, char* argv[])
     if(infile != stdin) fclose(infile);
     if(!commands)
     {
-        fprintf(stderr, "Error parsing command lines\n");
-        exit(EXIT_FAILURE);
-    } else if(!*commands)
-    {
-        fprintf(stderr, "Nothing to pipe\n");
-        free_command_lines(commands);
+        fprintf(stderr, "Error parsing input file\n");
         exit(EXIT_FAILURE);
     }
 
     int pipe_fds[2 * nrof_commands];
     if(!create_pipes(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0])))
     {
-        free_command_lines(commands);
+        free_command_lines(commands, nrof_commands);
         exit(EXIT_FAILURE);
     }
 
     bool pipeline_ok = run_pipeline(commands, nrof_commands, pipe_fds);
 
-    free_command_lines(commands);
+    free_command_lines(commands, nrof_commands);
     close_fds(pipe_fds, sizeof(pipe_fds)/sizeof(pipe_fds[0]));
     int child_exit_status = reap_children();
 

@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "input.h"
 
 /*
@@ -56,56 +57,47 @@ static char** parse_line(const char* buffer)
 
 char*** get_command_lines(FILE* infile, size_t* out_nrof_lines)
 {
-    //TODO: remove null termination
-    //TODO: assert out_nrof_lines not null
-    size_t arr_len = 1;
-    char*** arr = malloc(arr_len * sizeof(char***));
-    if(!arr)
-    {
-        DEBUG_PRINT("malloc error");
-        return NULL;
-    }
-    *arr = NULL;
-
+    size_t arr_len = 0;
+    char*** arr = NULL;
     char linebuf[1025];
     while(fgets(linebuf, sizeof(linebuf), infile))
     {
-        char*** tmp = realloc(arr, (arr_len + 1) * sizeof(arr[0]));
+        char*** tmp = realloc(arr, (arr_len++) * sizeof(arr[0]));
         if(!tmp)
         {
             DEBUG_PRINT("realloc error");
-            free_command_lines(arr);
+            free_command_lines(arr, arr_len);
             return NULL;
         }
         arr = tmp;
 
         if(!(arr[arr_len - 1] = parse_line(linebuf)))
         {
-            free_command_lines(arr);
+            free_command_lines(arr, arr_len);
             return NULL;
         }
-        arr[arr_len++] = NULL;
     }
     if(ferror(infile))
     {
         perror("Error reading command lines");
-        free_command_lines(arr);
+        free_command_lines(arr, arr_len);
         return NULL;
     }
 
-    if(out_nrof_lines) *out_nrof_lines = arr_len - 1;
+    assert(out_nrof_lines);
+    *out_nrof_lines = arr_len;
     return arr;
 }
 
-void free_command_lines(char*** arr)
+void free_command_lines(char*** arr, size_t count)
 {
     if(!arr) return;
-    for(char*** p = arr; *p; ++p)
+    for(size_t i = 0; i < count; ++i)
     {
-        //Don't need to free each string individually because parse_lines() has
-        //made sure the strings get deallocated together with the string pointer
-        //array.
-        free(*p);
+        //Don't need to free each string individually because we made sure in
+        //parse_lines() that the strings are held in the same contigiously
+        //allocated block of memory.
+        free(arr[i]);
     }
     free(arr);
 }
