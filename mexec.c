@@ -2,7 +2,6 @@
     (C) Aleksander Zdunek <redacted>@cs.umu.se
     //TODO: fix header
 */
-//TODO: clean up includes?
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
