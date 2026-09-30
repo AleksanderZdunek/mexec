@@ -16,12 +16,11 @@
 #define PIPE_FD_IDX_READ 0
 #define PIPE_FD_IDX_WRITE 1
 
-//TODO: reorder
-bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
-int reap_children(void);
 bool create_pipes(int* fd, size_t count);
 void close_fds(int* fd, size_t count);
 bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds);
+bool exec_command(char** argv, int pipe_fd_in, int pipe_fd_out);
+int reap_children(void);
 
 int main(int argc, char* argv[])
 {
@@ -62,6 +61,60 @@ int main(int argc, char* argv[])
 
     if(pipeline_ok) return child_exit_status;
     return EXIT_FAILURE;
+}
+
+/*
+    TODO: Document
+*/
+bool create_pipes(int* fd, size_t count)
+{
+    assert(count % 2 == 0); //Should be an even number
+    memset(fd, 0, count * sizeof(fd[0]));
+    fd[0] = STDIN_FILENO;
+    fd[count - 1] = STDOUT_FILENO;
+    for(size_t i = 1; i < count - 1; i += 2)
+    {
+        int pipefd[2];
+        if(pipe(pipefd))
+        {
+            perror("Error creating pipe");
+            close_fds(fd, count);
+            return false;
+        }
+        fd[i] = pipefd[PIPE_FD_IDX_WRITE];
+        fd[i+1] = pipefd[PIPE_FD_IDX_READ];
+    }
+    return true;
+}
+
+/*
+    TODO: Document
+*/
+void close_fds(int* fd, size_t count)
+{
+    for(size_t i = 0; i < count; ++i)
+    {
+        if(fd[i] > STDERR_FILENO)
+        {
+            close(fd[i]);
+            fd[i] = STDIN_FILENO;
+        }
+    }
+}
+
+/*
+    TODO: Document
+*/
+bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds)
+{
+    for(size_t i = 0; i < nrof_commands; ++i)
+    {
+        int* fds = &pipe_fds[2*i];
+        bool ok = exec_command(commands[i], fds[PIPE_FD_IDX_READ], fds[PIPE_FD_IDX_WRITE]);
+        close_fds(fds, 2);
+        if(!ok) return false;
+    }
+    return true;
 }
 
 /*
@@ -181,58 +234,4 @@ int reap_children(void)
             }
         }
     }
-}
-
-/*
-    TODO: Document
-*/
-bool create_pipes(int* fd, size_t count)
-{
-    assert(count % 2 == 0); //Should be an even number
-    memset(fd, 0, count * sizeof(fd[0]));
-    fd[0] = STDIN_FILENO;
-    fd[count - 1] = STDOUT_FILENO;
-    for(size_t i = 1; i < count - 1; i += 2)
-    {
-        int pipefd[2];
-        if(pipe(pipefd))
-        {
-            perror("Error creating pipe");
-            close_fds(fd, count);
-            return false;
-        }
-        fd[i] = pipefd[PIPE_FD_IDX_WRITE];
-        fd[i+1] = pipefd[PIPE_FD_IDX_READ];
-    }
-    return true;
-}
-
-/*
-    TODO: Document
-*/
-void close_fds(int* fd, size_t count)
-{
-    for(size_t i = 0; i < count; ++i)
-    {
-        if(fd[i] > STDERR_FILENO)
-        {
-            close(fd[i]);
-            fd[i] = STDIN_FILENO;
-        }
-    }
-}
-
-/*
-    TODO: Document
-*/
-bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds)
-{
-    for(size_t i = 0; i < nrof_commands; ++i)
-    {
-        int* fds = &pipe_fds[2*i];
-        bool ok = exec_command(commands[i], fds[PIPE_FD_IDX_READ], fds[PIPE_FD_IDX_WRITE]);
-        close_fds(fds, 2);
-        if(!ok) return false;
-    }
-    return true;
 }
