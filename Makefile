@@ -10,7 +10,7 @@ CFLAGS = -g -std=gnu11 -Werror -Wall -Wextra -Wpedantic -Wmissing-declarations \
 
 all: $(TARGET)
 
-$(OBJ): parse_input.h debug.h
+$(OBJ): parse_input.h
 %.o: %.c Makefile
 	$(CC) $(CFLAGS) -c -o $@ $<
 

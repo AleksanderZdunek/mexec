@@ -9,6 +9,8 @@
 #include <assert.h>
 #include "parse_input.h"
 
+//----------------------------- Internal functions -----------------------------
+
 /*
     Parse a string into whitespace-separated tokens.
 
@@ -61,6 +63,8 @@ static char** parse_line(const char* buffer)
     return tokp_buf;
 }
 
+//----------------------------- External functions -----------------------------
+
 char*** parse_input(FILE* infile, size_t* out_nrof_lines)
 {
     size_t arr_len = 0;
@@ -71,7 +75,7 @@ char*** parse_input(FILE* infile, size_t* out_nrof_lines)
         char*** tmp = realloc(arr, (arr_len++) * sizeof(arr[0]));
         if(!tmp)
         {
-            DEBUG_PRINT("realloc error");
+            fprintf(stderr, "%s:%d:%s(): realloc error\n", __FILE__, __LINE__, __func__);
             free_command_lines(arr, arr_len);
             return NULL;
         }

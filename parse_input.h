@@ -8,9 +8,6 @@
 #define PARSE_INPUT_H
 #include <stdio.h>
 
-//TODO: remove
-#include "debug.h"
-
 /**
     Parse an input file where each line represents a command line.
 
