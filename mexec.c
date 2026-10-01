@@ -68,12 +68,27 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
 }
 
-/*
-    TODO: Document
+/**
+    Create \p count number of directional pipes. File descriptors for each pipe
+    are stored in the array pointed to by output parameter \p fd.
+    File descriptors are arranged such that even array indices hold read file
+    descriptors and odd indices hold write file descriptors. The read end of a
+    pipe is the element after the write end of the same pipe.
+    The first element of the array will be set to stdin (file descriptor 0) and
+    the last element of the array will be set to stdout.
+
+    fd = {stdin, pipe_1_write, pipe_1_read, ..., pipe_n_write, pipe_n_read, stdout}
+
+    @param[out] fd Array that will hold the file descriptors for the created pipes
+    @param count Length of the array. This should be an even number greater than
+        or equal to 2.
+
+    @return true on success, false on error
 */
 bool create_pipes(int* fd, size_t count)
 {
     assert(count % 2 == 0); //Should be an even number
+    assert(count > 1);
     memset(fd, 0, count * sizeof(fd[0]));
     fd[0] = STDIN_FILENO;
     fd[count - 1] = STDOUT_FILENO;
@@ -92,8 +107,13 @@ bool create_pipes(int* fd, size_t count)
     return true;
 }
 
-/*
-    TODO: Document
+/**
+    Close file descriptors held by array \p fd. Only close file descriptors
+    greater than 2; the standard streams stdin, stdout, stderr are not closed.
+    Closed file descriptors are set to 0 (stdin).
+
+    @param[in,out] fd Array of file descriptors
+    @param count Number of file descriptors to close
 */
 void close_fds(int* fd, size_t count)
 {
