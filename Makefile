@@ -2,7 +2,7 @@
 # Author: Aleksander Zdunek
 # Date: 2026-11-01
 TARGET = mexec
-OBJ = 	mexec.o input.o
+OBJ = 	mexec.o parse_input.o
 
 CC = gcc
 CFLAGS = -g -std=gnu11 -Werror -Wall -Wextra -Wpedantic -Wmissing-declarations \
@@ -10,7 +10,7 @@ CFLAGS = -g -std=gnu11 -Werror -Wall -Wextra -Wpedantic -Wmissing-declarations \
 
 all: $(TARGET)
 
-$(OBJ): input.h debug.h
+$(OBJ): parse_input.h debug.h
 %.o: %.c Makefile
 	$(CC) $(CFLAGS) -c -o $@ $<
 

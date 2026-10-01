@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "input.h"
+#include "parse_input.h"
 
 /*
     Parse a string into whitespace-separated tokens.
@@ -61,7 +61,7 @@ static char** parse_line(const char* buffer)
     return tokp_buf;
 }
 
-char*** get_command_lines(FILE* infile, size_t* out_nrof_lines)
+char*** parse_input(FILE* infile, size_t* out_nrof_lines)
 {
     size_t arr_len = 0;
     char*** arr = NULL;

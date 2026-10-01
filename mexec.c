@@ -15,7 +15,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <fcntl.h>
-#include "input.h"
+#include "parse_input.h"
 
 #define PIPE_FD_IDX_READ 0
 #define PIPE_FD_IDX_WRITE 1
@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
 
     size_t nrof_commands = 0;
     //I'm a three star programmer now!
-    char*** commands = get_command_lines(infile, &nrof_commands);
+    char*** commands = parse_input(infile, &nrof_commands);
     if(infile != stdin) fclose(infile);
     if(!commands)
     {
