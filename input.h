@@ -1,5 +1,8 @@
-/*
-    TODO: file header
+/** @file
+    Parse command lines from an input file
+
+    @author Aleksander Zdunek
+    @date 2026-11-01
 */
 #ifndef INPUT_H
 #define INPUT_H

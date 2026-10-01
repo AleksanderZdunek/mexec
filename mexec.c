@@ -1,6 +1,9 @@
-/*
-    (C) Aleksander Zdunek <redacted>@cs.umu.se
-    //TODO: fix header
+/** @file
+    Execute a pipeline of commands where stdout from one command is piped to
+    stdout of the next command.
+
+    @author Aleksander Zdunek
+    @date 2026-11-01
 */
 #define _GNU_SOURCE //pipe2()
 #include <stdio.h>

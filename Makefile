@@ -1,4 +1,6 @@
-#(C) Aleksander Zdunek <redacted>@cs.umu.se
+# Build mexec
+# Author: Aleksander Zdunek
+# Date: 2026-11-01
 TARGET = mexec
 OBJ = 	mexec.o input.o
 

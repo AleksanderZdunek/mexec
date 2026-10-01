@@ -1,3 +1,9 @@
+/** @file
+    Parse command lines from an input file
+
+    @author Aleksander Zdunek
+    @date 2026-11-01
+*/
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
