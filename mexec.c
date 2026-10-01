@@ -127,8 +127,18 @@ void close_fds(int* fd, size_t count)
     }
 }
 
-/*
-    TODO: Document
+/**
+    Put together and execute command pipeline.
+    Standard out from one command is connected with a pipe to standard in
+    for the next command.
+
+    @param commands List of command lines. Each command line is a null-terminated
+        array of strings where the first string is the command and the following
+        string are arguments.
+    @param nrof_commands Number of commands in the pipeline
+    @param pipe_fds Array of pipe file descriptors. See create_pipes().
+
+    @return true on success, false on error
 */
 bool run_pipeline(char*** commands, size_t nrof_commands, int* pipe_fds)
 {
