@@ -1,4 +1,4 @@
-.TH mexec 1 "17 September 2026" "Version 1.0"
+.TH mexec 1 "2 October 2026" "Version 2.0"
 
 .SH NAME
 mexec - my exec, creates a pipeline of commands
@@ -19,6 +19,110 @@ Command lines shall not be longer than 1024 bytes each.
 Empty lines and quotation marks are not supported.
 
 .SH SOLUTION
+Command lines are read from an input stream, either from stdin or from an open
+file. Each command line is parsed into an array of arguments, where the first
+element is the command itself and the rest of the elements are arguments for the
+command. For each input line a pointer to the parsed command line is stored in a
+growing dynamically reallocated array. The whole input stream is parsed before
+moving on with the rest of the solution.
+.P
+The number of pipes needed to construct the full pipeline of commands is one
+less than the number of commands. Once the input stream is parsed this number is
+known and all pipes are created in one pass. File descriptors for created pipes
+are stored in an array, where even indices are the write ends of each pipe and
+and odd indices are the read ends belonging to the same pipe as the even index
+before.
+If
+.I i
+is an index into the list of commands then the index into the pipe file
+descriptors array for the read end of the preceding pipe is
+.RI 2* i
+and the index for the write end for the following pipe is
+.RI 2* i +1.
+The first element of the file descriptor array, index = 0, is assigned the file
+descriptor for standard input and the last element is assigned the file
+descriptor for standard output.
+.IP "Illustration of the pipe file descriptor array layout:"
+[stdin, pipe_1_write, pipe_1_read, ..., pipe_n_write, pipe_n_read, stdout]
+.P
+The pipe file descriptors are opened with the "close on exec" (FD_CLOEXEC) flag
+set. This ensures no pipe file descriptors remain open in the child process
+upon successful execution of the command. A pipe is easily created with CLOEXEC
+using the GNU library extension
+.MR pipe2 2 .
+Otherwise the flags need to be set for each file descriptor with
+.MR fcntl 2
+after pipe creation.
+.P
+Once commands have been parsed and pipes created the pipeline is assembled and
+each command is executed.
+Executing a command is done by forkinging the process with
+.MR fork 2 .
+In the child process the read end of the input pipe is attached to the file
+descriptor for stdin and the write end of the output pipe is attached to the
+file descriptor for stdout, with
+.MR dup2 2 .
+Then the command is executed with
+.MR execvp 3
+by passing the command argument array pointer.
+Duplicated file descriptors do not inherit the FD_CLOEXEC flag, ensuring the
+input and output pipes remaining open and accessible in the executed command
+process through the standard input/output file descriptors, while preventing
+access to any remaining pipes in the created pipe pool since those file
+descriptors are closed automatically in the child process on successful
+execution of the command.
+.br
+In the main process pipe file descriptors are closed successively once no longer
+needed after each command has been executed.
+.P
+Once the whole pipeline has been set up the main process frees all dynamically
+allocated memory for parsed commands and waits for all child command processes
+to terminate before exiting. If an error occurs any remaining pipe file
+descriptors are also closed and the main process exits with the EXIT_FAILURE
+exit status, or otherwise with the status code from any of the child processes.
+If an exec error occurs in a forked child process takes the same code path
+as the main process to clean up and exit. Since the failed child process has no
+child processes of its own it is not a problem to call on the await children
+subroutine.
+
+.SS Summary of main algorithm
+.IP "1. Parse input"
+.IP "2. Create pipes"
+.IP "3. Execute commands"
+.RS
+.IP "3.1 Fork process"
+In child process:
+.RS
+.IP "3.1.1 Duplicate read end of input pipe on to stdin file descriptor"
+.IP "3.3.1.2 Duplicate write end of output pipe on to stdout file descriptor"
+.IP "3.3.1.2 exec() command"
+.RE
+.RE
+.IP "4. Await child processes"
+.IP "6. Exit with appropriate status code"
+
+.SS Changes from version 1.0
+.IP \(bu 3
+Reorganised the main algorithm from interleaving reading and parsing input line,
+creating pipe and executing command, to parsing all input in one batch and
+creating an open pipe pool before executing commands. I felt this was a big
+enough rewrite to motivate an increase in major version number.
+.IP \(bu 3
+Refactoring main simplified code path for error handling, removing the need for
+goto.
+.IP \(bu 3
+Removed global flag identifying the main process, letting a child process follow
+the same error handling path as the main process.
+.IP \(bu 3
+Set FD_CLOEXEC on file descriptors on pipe creation.
+.IP \(bu 3
+Broke out input parsing code to separate compilation unit.
+.IP \(bu 3
+Added description and date to file header comments.
+.IP \(bu 3
+Updated man page solution section.
+
+.SH SOLUTION (OLD)
 Command lines are read from an input stream, either from stdin or from an open
 file. Each command line is parsed into an array of arguments, where the first
 element is the command itself and the rest of the elements are arguments for the
